@@ -2,6 +2,7 @@ package cache
 
 import (
 	"reflect"
+	"strings"
 	"unsafe"
 )
 
@@ -34,6 +35,10 @@ func string2slice(k string) []byte {
 	sh.Cap = sh.Len
 
 	return *(*[]byte)(unsafe.Pointer(sh))
+}
+
+func slice2string(k []byte) []byte {
+	return *(*string)(unsafe.Pointer(&k))
 }
 
 func string2slicev2(k string) []byte {

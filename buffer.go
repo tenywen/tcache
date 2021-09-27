@@ -16,14 +16,17 @@ var (
 	errKeyNotExist = errors.New("key not exist")
 )
 
-type buffer struct {
+type shared struct {
 	id int64
 	// id -> start index
 	ids map[int64]int64
 
 	// hash -> id
-	keys  map[uint64]int64
-	bytes bytes
+	keys map[uint64]int64
+
+	buffer buffer
+
+	collision map[string][]byte
 }
 
 type head struct {
@@ -42,66 +45,77 @@ type data struct {
 	body body
 }
 
-func (b buffer) get(key uint64) ([]byte, error) {
-	id, ok := b.keys[key]
+func newShared() shared {
+	return shared{
+		id:        1,
+		ids:       make(map[int64]int64),
+		keys:      make(map[uint64]int64),
+		collision: make(map[string][]byte),
+	}
+}
+
+func (s shared) get(key string, hasher Hasher) ([]byte, error) {
+	hash := hasher.Sum64(key)
+	id, ok := s.keys[hash]
 	if !ok {
 		return nil, errKeyNotExist
 	}
 
-	data, err := b.getData(id)
+	body, err := s.decode(id)
 	if err != nil {
 		return nil, err
 	}
-	return data.body.v, nil
+
+	if string2slice(body.k) != key {
+		return nil, nil
+	}
 }
 
-func (b *buffer) set(k string, v []byte, hasher Hasher) {
+func (s *shared) set(k string, v []byte, hasher Hasher) {
 	hash := hasher.Sum64(k)
-	id, ok := b.keys[hash]
+	id, ok := s.keys[hash]
 	if ok {
 		// TODO
-		b.del(id)
+		s.del(id)
 		return
 	}
 
-	b.write(string2slice(k), v)
+	s.write(string2slice(k), v)
 }
 
-func (b *buffer) del(id int64) {
+func (s *shared) del(id int64) {
 
 }
 
-func (b buffer) getData(id int64) (data data, err error) {
-	var si int64
-	si, ok := b.ids[id]
+func (s shared) decode(id int64) (body body, err error) {
+	si, ok := s.ids[id]
 	if !ok {
 		err = errIdNotExist
 		return
 	}
-	return b.decode(si)
+
+	return s.body(si)
 }
 
-func (b buffer) decode(si int64) (data data, err error) {
-	data.head.id = b.bytes.int64(si, si+idLen)
-	data.head.kl = b.bytes.int64(si+idLen, si+idLen+keyLen)
-	data.head.vl = b.bytes.int64(si+idLen+keyLen, si+idLen+keyLen+valueLen)
+func (s shared) body(si int64) (body body, err error) {
+	kl := s.buffer.int64(si+idLen, si+idLen+keyLen)
+	vl := s.buffer.int64(si+idLen+keyLen, si+headLen)
 
-	startBody := si + headLen
-	data.body.k, err = b.bytes.read(startBody, startBody+data.head.kl)
+	body.k, err = s.buffer.read(si+headLen, si+headLen+kl)
 	if err != nil {
 		return
 	}
-	data.body.v, err = b.bytes.read(startBody+data.head.kl, startBody+data.head.kl+data.head.vl)
-	return
+
+	body.v, err = s.buffer.read(si+headLen+kl, si+headLen+kl+vl)
 }
 
-func (b *buffer) write(k, v []byte) {
-	b.id++
-	id := b.id
-	b.ids[id] = b.bytes.tail()
-	b.bytes.putInt64(id)
-	b.bytes.putInt64(int64(len(k)))
-	b.bytes.putInt64(int64(len(v)))
-	b.bytes.write(k)
-	b.bytes.write(v)
+func (s *shared) write(k, v []byte) {
+	s.id++
+	id := s.id
+	s.ids[id] = s.buffer.tail()
+	s.buffer.putInt64(id)
+	s.buffer.putInt64(int64(len(k)))
+	s.buffer.putInt64(int64(len(v)))
+	s.buffer.write(k)
+	s.buffer.write(v)
 }

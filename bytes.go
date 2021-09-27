@@ -11,15 +11,15 @@ const (
 
 var (
 	errReadPos  = errors.New("read start_pos or end_pos error")
-	errCapLimit = errors.New("bytes cap exceeds limit ")
+	errCapLimit = errors.New("buffer cap exceeds limit ")
 )
 
-type bytes struct {
-	off int64
-	m   []byte
+type buffer struct {
+	off   int64
+	bytes []byte
 }
 
-func (b *bytes) grow(n int64) bool {
+func (b *buffer) grow(n int64) bool {
 	if n <= 0 {
 		return true
 	}
@@ -40,7 +40,7 @@ func (b *bytes) grow(n int64) bool {
 	return true
 }
 
-func (b *bytes) tryGrowByReslice(n int64) bool {
+func (b *buffer) tryGrowByReslice(n int64) bool {
 	if n+b.off <= int64(cap(b.m)) {
 		b.m = b.m[:b.off+n]
 		return true
@@ -49,7 +49,7 @@ func (b *bytes) tryGrowByReslice(n int64) bool {
 	return false
 }
 
-func (b *bytes) write(p []byte) int64 {
+func (b *buffer) write(p []byte) int64 {
 	l := int64(len(p))
 	if !b.grow(l) {
 		return undefined
@@ -59,7 +59,7 @@ func (b *bytes) write(p []byte) int64 {
 	return l
 }
 
-func (b bytes) read(start, end int64) ([]byte, error) {
+func (b buffer) read(start, end int64) ([]byte, error) {
 	if start < 0 || end < start {
 		return nil, errReadPos
 	}
@@ -74,7 +74,7 @@ func (b bytes) read(start, end int64) ([]byte, error) {
 	return data, nil
 }
 
-func (b bytes) int64(start, end int64) int64 {
+func (b buffer) int64(start, end int64) int64 {
 	data, err := b.read(start, end)
 	if err != nil {
 		return undefined
@@ -83,11 +83,11 @@ func (b bytes) int64(start, end int64) int64 {
 	return int64(binary.LittleEndian.Uint64(data))
 }
 
-func (b bytes) tail() int64 {
+func (b buffer) tail() int64 {
 	return b.off
 }
 
-func (b *bytes) putInt64(v int64) {
+func (b *buffer) putInt64(v int64) {
 	if !b.grow(int64Len) {
 		return
 	}
