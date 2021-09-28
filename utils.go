@@ -37,10 +37,6 @@ func string2slice(k string) []byte {
 	return *(*[]byte)(unsafe.Pointer(sh))
 }
 
-func slice2string(k []byte) []byte {
+func slice2string(k []byte) string {
 	return *(*string)(unsafe.Pointer(&k))
-}
-
-func string2slicev2(k string) []byte {
-	return []byte(k)
 }
