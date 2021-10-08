@@ -2,7 +2,6 @@ package cache
 
 import (
 	"reflect"
-	"strings"
 	"unsafe"
 )
 

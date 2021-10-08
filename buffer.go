@@ -10,7 +10,7 @@ const (
 )
 
 var (
-	errReadPos  = errors.New("read start_pos or end_pos error")
+	errReadPos  = errors.New("read start pos or end pos error")
 	errCapLimit = errors.New("buffer cap exceeds limit ")
 )
 
@@ -28,21 +28,21 @@ func (b *buffer) grow(n int64) bool {
 		return true
 	}
 
-	c := int64(cap(b.m)) + n
+	c := int64(cap(b.bytes)) + n
 	p2 := power2(c)
 	if p2 < c {
 		return false
 	}
 
 	m := make([]byte, p2)
-	copy(m, b.m[:b.off])
-	b.m = m
+	copy(m, b.bytes[:b.off])
+	b.bytes = m
 	return true
 }
 
 func (b *buffer) tryGrowByReslice(n int64) bool {
-	if n+b.off <= int64(cap(b.m)) {
-		b.m = b.m[:b.off+n]
+	if n+b.off <= int64(cap(b.bytes)) {
+		b.bytes = b.bytes[:b.off+n]
 		return true
 	}
 
@@ -54,10 +54,20 @@ func (b *buffer) write(p []byte) int64 {
 	if !b.grow(l) {
 		return undefined
 	}
-	copy(b.m[b.off:], p)
+	copy(b.bytes[b.off:], p)
 	b.off += l
 	return l
 }
+
+/*
+func (b buffer) copyRead(start, end int64) ([]byte, error) {
+	if src, err := b.read(start, end); err != nil {
+		return nil, err
+	}
+
+	return nil, nil
+}
+*/
 
 func (b buffer) read(start, end int64) ([]byte, error) {
 	if start < 0 || end < start {
@@ -68,12 +78,10 @@ func (b buffer) read(start, end int64) ([]byte, error) {
 		return nil, errCapLimit
 	}
 
-	data := make([]byte, end-start+1)
-	copy(data, b.bytes[start:end+1])
-	return data, nil
+	return b.bytes[start:end], nil
 }
 
-func (b buffer) int64(si int64) int64 {
+func (b buffer) btoi(si int64) int64 {
 	if si > b.off || si+int64Len > b.off {
 		return undefined
 	}
@@ -84,9 +92,10 @@ func (b buffer) int64(si int64) int64 {
 	}
 
 	return int64(binary.LittleEndian.Uint64(data))
+
 }
 
-func (b *buffer) putInt64(v int64) {
+func (b *buffer) writeInt64(v int64) {
 	if !b.grow(int64Len) {
 		return
 	}

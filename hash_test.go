@@ -12,7 +12,7 @@ var (
 )
 
 func TestHash(t *testing.T) {
-	total := 1000000000
+	total := 1000000
 	m := make(map[uint64]struct{}, total)
 	collison := 0
 	for i := 1; i < total; i++ {
