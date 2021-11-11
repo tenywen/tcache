@@ -9,7 +9,7 @@ const (
 	max = 1 << 32
 )
 
-func power2(cap int64) int64 {
+func power2(cap int) int {
 	cap = cap - 1
 	cap |= cap >> 1
 	cap |= cap >> 2

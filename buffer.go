@@ -15,11 +15,11 @@ var (
 )
 
 type buffer struct {
-	off   int64
+	off   int
 	bytes []byte
 }
 
-func (b *buffer) grow(n int64) bool {
+func (b *buffer) grow(n int) bool {
 	if n <= 0 {
 		return true
 	}
@@ -28,7 +28,7 @@ func (b *buffer) grow(n int64) bool {
 		return true
 	}
 
-	c := int64(cap(b.bytes)) + n
+	c := cap(b.bytes) + n
 	p2 := power2(c)
 	if p2 < c {
 		return false
@@ -40,8 +40,8 @@ func (b *buffer) grow(n int64) bool {
 	return true
 }
 
-func (b *buffer) tryGrowByReslice(n int64) bool {
-	if n+b.off <= int64(cap(b.bytes)) {
+func (b *buffer) tryGrowByReslice(n int) bool {
+	if n+b.off <= cap(b.bytes) {
 		b.bytes = b.bytes[:b.off+n]
 		return true
 	}
@@ -49,27 +49,29 @@ func (b *buffer) tryGrowByReslice(n int64) bool {
 	return false
 }
 
-func (b *buffer) write(p []byte) int64 {
-	l := int64(len(p))
+func (b *buffer) rewrite(s, n int, k, v []byte) {
+	if s+n > b.off || len(k)+len(v) != n {
+		panic("buffer rewrite fatal")
+	}
+
+	if len(k)+len(v) != n {
+		panic("buffer rewrite size fatal")
+	}
+
+	write(b.bytes[s:], k)
+	write(b.bytes[s+len(k):], v)
+}
+
+func (b *buffer) write(p []byte) {
+	l := len(p)
 	if !b.grow(l) {
-		return undefined
-	}
-	copy(b.bytes[b.off:], p)
-	b.off += l
-	return l
-}
-
-/*
-func (b buffer) copyRead(start, end int64) ([]byte, error) {
-	if src, err := b.read(start, end); err != nil {
-		return nil, err
+		return
 	}
 
-	return nil, nil
+	b.off += write(b.bytes[b.off:], p)
 }
-*/
 
-func (b buffer) read(start, end int64) ([]byte, error) {
+func (b buffer) read(start, end int) ([]byte, error) {
 	if start < 0 || end < start {
 		return nil, errReadPos
 	}
@@ -81,7 +83,7 @@ func (b buffer) read(start, end int64) ([]byte, error) {
 	return b.bytes[start:end], nil
 }
 
-func (b buffer) btoi(si int64) int64 {
+func (b buffer) btoi(si int) int {
 	if si > b.off || si+int64Len > b.off {
 		return undefined
 	}
@@ -91,14 +93,22 @@ func (b buffer) btoi(si int64) int64 {
 		return undefined
 	}
 
-	return int64(binary.LittleEndian.Uint64(data))
+	return int(binary.LittleEndian.Uint64(data))
 
 }
 
-func (b *buffer) writeInt64(v int64) {
+func (b *buffer) writeInt(v int) {
 	if !b.grow(int64Len) {
 		return
 	}
-	binary.LittleEndian.PutUint64(b.bytes[b.off:], uint64(v))
-	b.off += int64Len
+	b.off += writeInt(b.bytes[b.off:], v)
+}
+
+func writeInt(bytes []byte, v int) int {
+	binary.LittleEndian.PutUint64(bytes, uint64(v))
+	return int64Len
+}
+
+func write(bytes []byte, p []byte) int {
+	return copy(bytes, p)
 }

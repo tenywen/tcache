@@ -18,17 +18,12 @@ var (
 	errKeyNotExist = errors.New("key not exist")
 )
 
-type pos struct {
-	start int
-	end   int
-}
-
 type shared struct {
 	id int64
 
-	keys map[uint64]int64 // hash -> start
+	keys map[uint64]int // hash -> start
 
-	removes []pos
+	remove remove
 
 	buffer buffer
 
@@ -54,13 +49,19 @@ type data struct {
 
 func newShared() shared {
 	return shared{
-		keys:      make(map[uint64]int64),
+		keys:      make(map[uint64]int),
 		collision: make(map[string][]byte),
 		ps:        newPools(8, 1<<16),
 	}
 }
 
 func (s shared) get(key string, hasher Hasher) ([]byte, error) {
+	// hit collision
+	b, ok := s.collision[key]
+	if ok {
+		return b, nil
+	}
+
 	hash := hasher.Sum64(key)
 	start, ok := s.keys[hash]
 	if !ok {
@@ -72,27 +73,27 @@ func (s shared) get(key string, hasher Hasher) ([]byte, error) {
 		return nil, err
 	}
 
-	if slice2string(body.k) == key {
-		return body.v, nil
-	}
-
-	// hit collision
-	b, ok := s.collision[key]
-	if !ok {
-		return nil, errKeyNotExist
-	}
-
-	return b, nil
+	return body.v, nil
 }
 
-func (s *shared) set(k string, v []byte, hasher Hasher) {
-	hash := hasher.Sum64(k)
+func (s *shared) set(key string, v []byte, hasher Hasher) {
+	hash := hasher.Sum64(key)
 	if _, ok := s.keys[hash]; ok {
-		s.collision[k] = v
+		s.collision[key] = v
 		return
 	}
 
-	s.keys[hash] = s.write(string2slice(k), v)
+	k := string2slice(key)
+	size := headLen + len(k) + len(v)
+
+	start := s.remove.getBlock(size)
+	if start != -1 {
+		s.buffer.rewrite(start, size, k, v)
+		s.keys[hash] = start
+		return
+	}
+
+	s.keys[hash] = s.write(k, v)
 }
 
 func (s *shared) del(key string, hasher Hasher) {
@@ -112,11 +113,11 @@ func (s *shared) del(key string, hasher Hasher) {
 		return
 	}
 
-	s.removes = append(s.removes, pos{start: int(start), end: int(start) + headLen + len(body.k) + len(body.v) - 1})
+	s.remove.add(int(start), headLen+len(body.k)+len(body.v))
 	delete(s.keys, hash)
 }
 
-func (s shared) body(si int64) (body body, err error) {
+func (s shared) body(si int) (body body, err error) {
 	kl := s.buffer.btoi(si)
 	vl := s.buffer.btoi(si + keyLen)
 
@@ -159,41 +160,11 @@ func (s *shared) adjust(start, end, val int64, hasher Hasher) error {
 	return nil
 }
 
-func (s *shared) write(k, v []byte) int64 {
+func (s *shared) write(k, v []byte) int {
 	start := s.buffer.off
-	s.buffer.writeInt64(int64(len(k)))
-	s.buffer.writeInt64(int64(len(v)))
+	s.buffer.writeInt(len(k))
+	s.buffer.writeInt(len(v))
 	s.buffer.write(k)
 	s.buffer.write(v)
 	return start
-}
-
-func (s *shared) writeInt16(k int16) (start int64) {
-	start = s.buffer.off
-	//s.buffer.write()
-	return
-}
-
-func (s *shared) writeInt32() (start int64) {
-	return
-}
-
-func (s *shared) writeInt64() (start int64) {
-	return
-}
-
-func (s shared) readInt() {}
-
-type sorts []pos
-
-func (s sorts) Less(i, j int) bool {
-	return s[i].start > s[j].start
-}
-
-func (s sorts) Len() int {
-	return len(s)
-}
-
-func (s sorts) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
 }
