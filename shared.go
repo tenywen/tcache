@@ -2,15 +2,11 @@ package cache
 
 import (
 	"errors"
-	"sort"
 )
 
 const (
 	undefined = -1
-
-	keyLen   = 8
-	valueLen = 8
-	headLen  = keyLen + valueLen
+	headLen   = 3 * 8
 )
 
 var (
@@ -23,18 +19,17 @@ type shared struct {
 
 	keys map[uint64]int // hash -> start
 
-	remove remove
+	remove sortBlocks
 
 	buffer buffer
 
 	collision map[string][]byte
-
-	ps pools
 }
 
 type head struct {
-	kl int64 // key length
-	vl int64 // value length
+	total int // bytes
+	kl    int // bytes
+	vl    int // bytes
 }
 
 type body struct {
@@ -51,7 +46,7 @@ func newShared() shared {
 	return shared{
 		keys:      make(map[uint64]int),
 		collision: make(map[string][]byte),
-		ps:        newPools(8, 1<<16),
+		buffer:    newBuffer(1, 1024),
 	}
 }
 
@@ -86,10 +81,10 @@ func (s *shared) set(key string, v []byte, hasher Hasher) {
 	k := string2slice(key)
 	size := headLen + len(k) + len(v)
 
-	start := s.remove.getBlock(size)
-	if start != -1 {
-		s.buffer.rewrite(start, size, k, v)
-		s.keys[hash] = start
+	block, ok := s.remove.getBlock(size)
+	if ok {
+		s.buffer.rewrite(block.start, block.total, k, v)
+		s.keys[hash] = block.start
 		return
 	}
 
@@ -118,8 +113,8 @@ func (s *shared) del(key string, hasher Hasher) {
 }
 
 func (s shared) body(si int) (body body, err error) {
-	kl := s.buffer.btoi(si)
-	vl := s.buffer.btoi(si + keyLen)
+	kl := s.buffer.btoi(si + int64Len)
+	vl := s.buffer.btoi(si + int64Len + int64Len)
 
 	body.k, err = s.buffer.read(si+headLen, si+headLen+kl)
 	if err != nil {
@@ -130,6 +125,7 @@ func (s shared) body(si int) (body body, err error) {
 	return
 }
 
+/*
 func (s *shared) shrink(hasher Hasher) {
 	sort.Sort(sorts(s.removes))
 	start := s.removes[0].start
@@ -159,12 +155,11 @@ func (s *shared) adjust(start, end, val int64, hasher Hasher) error {
 
 	return nil
 }
+*/
 
 func (s *shared) write(k, v []byte) int {
 	start := s.buffer.off
-	s.buffer.writeInt(len(k))
-	s.buffer.writeInt(len(v))
-	s.buffer.write(k)
-	s.buffer.write(v)
+	s.buffer.writeInt(headLen, len(k), len(v))
+	s.buffer.write(k, v)
 	return start
 }

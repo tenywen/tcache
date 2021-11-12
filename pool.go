@@ -21,7 +21,7 @@ func newPool(size int) *sync.Pool {
 
 func newPools(min, max int) pools {
 	if min > max {
-		panic("maxSize less than minSize")
+		panic("pool maxSize less than minSize")
 	}
 
 	ps := pools{
@@ -51,6 +51,9 @@ func (ps *pools) get(size int) []byte {
 
 func (ps *pools) put(b []byte) {
 	pool := ps.getPool(cap(b))
+	if pool == nil {
+		return
+	}
 	pool.Put(b)
 }
 
