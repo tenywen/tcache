@@ -3,8 +3,10 @@ package cache
 import "sort"
 
 type block struct {
-	start int
+	si    int
 	total int
+	kl    int
+	vl    int
 }
 
 type sortBlocks []block
@@ -21,8 +23,8 @@ func (sb sortBlocks) Less(i, j int) bool {
 	return sb[i].total < sb[j].total
 }
 
-func (sb *sortBlocks) add(start int, total int) {
-	*sb = append(*sb, block{start: start, total: total})
+func (sb *sortBlocks) add(b block) {
+	*sb = append(*sb, b)
 }
 
 func (sb *sortBlocks) getBlock(size int) (b block, ok bool) {

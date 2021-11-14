@@ -2,7 +2,6 @@ package cache
 
 import (
 	"math"
-	"strconv"
 	"testing"
 )
 
@@ -24,10 +23,18 @@ func Test2Slice(t *testing.T) {
 	t.Log(string(string2slice("test is a test")))
 }
 
-func Benchmark2Slice(b *testing.B) {
-	key := "test is a test"
+func Benchmark2SliceV1(b *testing.B) {
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		string2slice(key + strconv.FormatInt(int64(0), 10))
+		string2slice("123456")
 	}
+}
 
+func Benchmark2SliceV2(b *testing.B) {
+	key := "test is a test"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b := []byte(key)
+		b[0] = 1
+	}
 }

@@ -6,7 +6,6 @@ import (
 
 const (
 	undefined = -1
-	headLen   = 3 * 8
 )
 
 var (
@@ -17,19 +16,13 @@ var (
 type shared struct {
 	id int64
 
-	keys map[uint64]int // hash -> start
+	keys map[uint64]block // hash -> block
 
-	remove sortBlocks
+	recycle sortBlocks
 
 	buffer buffer
 
 	collision map[string][]byte
-}
-
-type head struct {
-	total int // bytes
-	kl    int // bytes
-	vl    int // bytes
 }
 
 type body struct {
@@ -37,14 +30,9 @@ type body struct {
 	v []byte
 }
 
-type data struct {
-	head head
-	body body
-}
-
 func newShared() shared {
 	return shared{
-		keys:      make(map[uint64]int),
+		keys:      make(map[uint64]block),
 		collision: make(map[string][]byte),
 		buffer:    newBuffer(1, 1024),
 	}
@@ -58,17 +46,17 @@ func (s shared) get(key string, hasher Hasher) ([]byte, error) {
 	}
 
 	hash := hasher.Sum64(key)
-	start, ok := s.keys[hash]
+	block, ok := s.keys[hash]
 	if !ok {
 		return nil, errKeyNotExist
 	}
 
-	body, err := s.body(start)
+	si := block.si + block.kl
+	v, err := s.buffer.read(si, block.vl+si)
 	if err != nil {
 		return nil, err
 	}
-
-	return body.v, nil
+	return v, nil
 }
 
 func (s *shared) set(key string, v []byte, hasher Hasher) {
@@ -79,16 +67,20 @@ func (s *shared) set(key string, v []byte, hasher Hasher) {
 	}
 
 	k := string2slice(key)
-	size := headLen + len(k) + len(v)
+	size := len(k) + len(v)
 
-	block, ok := s.remove.getBlock(size)
-	if ok {
-		s.buffer.rewrite(block.start, block.total, k, v)
-		s.keys[hash] = block.start
-		return
+	b, ok := s.recycle.getBlock(size)
+	if !ok {
+		b = block{
+			si:    s.buffer.off,
+			total: size,
+		}
 	}
 
-	s.keys[hash] = s.write(k, v)
+	b.kl = len(k)
+	b.vl = len(v)
+	s.buffer.write(b.si, size, k, v)
+	s.keys[hash] = b
 }
 
 func (s *shared) del(key string, hasher Hasher) {
@@ -98,31 +90,13 @@ func (s *shared) del(key string, hasher Hasher) {
 	}
 
 	hash := hasher.Sum64(key)
-	start, ok := s.keys[hash]
+	block, ok := s.keys[hash]
 	if !ok {
 		return
 	}
 
-	body, err := s.body(start)
-	if err != nil || slice2string(body.k) != key {
-		return
-	}
-
-	s.remove.add(int(start), headLen+len(body.k)+len(body.v))
+	s.recycle.add(block)
 	delete(s.keys, hash)
-}
-
-func (s shared) body(si int) (body body, err error) {
-	kl := s.buffer.btoi(si + int64Len)
-	vl := s.buffer.btoi(si + int64Len + int64Len)
-
-	body.k, err = s.buffer.read(si+headLen, si+headLen+kl)
-	if err != nil {
-		return
-	}
-
-	body.v, err = s.buffer.read(si+headLen+kl, si+headLen+kl+vl)
-	return
 }
 
 /*
@@ -156,10 +130,3 @@ func (s *shared) adjust(start, end, val int64, hasher Hasher) error {
 	return nil
 }
 */
-
-func (s *shared) write(k, v []byte) int {
-	start := s.buffer.off
-	s.buffer.writeInt(headLen, len(k), len(v))
-	s.buffer.write(k, v)
-	return start
-}
