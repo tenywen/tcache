@@ -5,6 +5,15 @@ import (
 	"unsafe"
 )
 
+type sliceHeader struct {
+	Data unsafe.Pointer
+	Len  int
+	Cap  int
+}
+
+type stringHeader struct {
+}
+
 const (
 	max = 1 << 32
 )
