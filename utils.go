@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"reflect"
 	"unsafe"
 )
 
@@ -12,6 +11,8 @@ type sliceHeader struct {
 }
 
 type stringHeader struct {
+	Data unsafe.Pointer
+	Len  int
 }
 
 const (
@@ -27,7 +28,6 @@ func power2(cap int) int {
 	cap |= cap >> 16
 
 	if cap < 0 {
-		println("xxx", cap)
 		return max
 	}
 
@@ -39,10 +39,11 @@ func power2(cap int) int {
 }
 
 func string2slice(k string) []byte {
-	sh := (*reflect.SliceHeader)(unsafe.Pointer(&k))
-	sh.Cap = sh.Len
-
-	return *(*[]byte)(unsafe.Pointer(sh))
+	const max = 0x7fff0000
+	if len(k) > max {
+		panic("string too long")
+	}
+	return (*[max]byte)((*stringHeader)(unsafe.Pointer(&k)).Data)[:len(k):len(k)]
 }
 
 func slice2string(k []byte) string {

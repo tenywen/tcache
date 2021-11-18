@@ -32,9 +32,10 @@ func Benchmark2SliceV1(b *testing.B) {
 
 func Benchmark2SliceV2(b *testing.B) {
 	key := "test is a test"
+	var t []byte
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		b := []byte(key)
-		b[0] = 1
+		t = []byte(key)
 	}
+	t[0] = 1
 }
