@@ -1,11 +1,12 @@
 package cache
 
 import (
+	"math"
 	"unsafe"
 )
 
 type sliceHeader struct {
-	Data unsafe.Pointer
+	Data unsafe.Pointer // pointer vs uintptr
 	Len  int
 	Cap  int
 }
@@ -16,7 +17,7 @@ type stringHeader struct {
 }
 
 const (
-	max = 1 << 32
+	max = math.MaxInt64
 )
 
 func power2(cap int) int {
@@ -31,7 +32,7 @@ func power2(cap int) int {
 		return max
 	}
 
-	if cap > max {
+	if cap >= max {
 		return max
 	}
 

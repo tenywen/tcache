@@ -5,7 +5,7 @@ import (
 )
 
 func TestGrow(t *testing.T) {
-	b := newBuffer(1, 1024)
+	b := newBuffer(1024)
 	b.grow(2)
 	t.Log(len(b.bytes), cap(b.bytes))
 	b.grow(23)
@@ -19,17 +19,17 @@ func TestGrow(t *testing.T) {
 }
 
 func TestWriteBytes(t *testing.T) {
-	b := newBuffer(1, 1024)
-	k := []byte("key234234")
-	v := []byte("value34234")
-	b.write(b.off, len(k)+len(v), k, v)
+	b := newBuffer(1024)
+	v := []byte("2222")
+	k := []byte("111")
+	b.write(b.off, len(v)+len(v), v, v)
 	t.Log(b.off)
-	b.write(b.off, len(k)+len(v), k, v)
+	b.write(0, len(k)+len(v), k, k)
 	t.Log(b.off)
 }
 
 func TestReadBytes(t *testing.T) {
-	b := newBuffer(1, 1024)
+	b := newBuffer(1024)
 	k := []byte("key234234")
 	v := []byte("value34234")
 	b.write(b.off, len(k)+len(v), k, v)

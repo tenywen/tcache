@@ -5,7 +5,8 @@ import (
 )
 
 const (
-	int64Len = 8
+	int64Len      = 8
+	defaultBuffer = 1 << 22 // 4MB
 )
 
 var (
@@ -14,14 +15,18 @@ var (
 )
 
 type buffer struct {
+	max   int
 	off   int
 	bytes []byte
-	pools pools
 }
 
-func newBuffer(min, max int) buffer {
+func newBuffer(max int) buffer {
+	if max < defaultBuffer {
+		max = defaultBuffer
+	}
+
 	return buffer{
-		pools: newPools(min, max),
+		max: max,
 	}
 }
 
@@ -40,9 +45,8 @@ func (b *buffer) grow(n int) bool {
 		return false
 	}
 
-	m := b.pools.get(p2)
+	m := make([]byte, p2)
 	copy(m, b.bytes[:b.off])
-	b.pools.put(b.bytes)
 	b.bytes = m
 	return true
 }
@@ -60,9 +64,13 @@ func (b *buffer) tryGrowByReslice(n int) bool {
 	return false
 }
 
-func (b *buffer) write(si, n int, k, v []byte) {
-	if si+n > b.off {
-		b.grow(si + n - b.off)
+func (b *buffer) write(si, n int, k, v []byte) error {
+	if si+n > b.max {
+		return errCapLimit
+	}
+
+	if si+n > b.off && !b.grow(si+n-b.off) {
+		return errCapLimit
 	}
 
 	copy(b.bytes[si:], k)
@@ -70,6 +78,7 @@ func (b *buffer) write(si, n int, k, v []byte) {
 	if si+n > b.off {
 		b.off = si + n
 	}
+	return nil
 }
 
 func (b buffer) read(start, end int) ([]byte, error) {

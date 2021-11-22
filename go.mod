@@ -2,4 +2,9 @@ module cache
 
 go 1.16
 
-require github.com/cespare/xxhash/v2 v2.1.2
+require (
+	github.com/VictoriaMetrics/fastcache v1.7.0
+	github.com/allegro/bigcache v1.2.1
+	github.com/cespare/xxhash/v2 v2.1.2
+	github.com/stretchr/testify v1.7.0 // indirect
+)

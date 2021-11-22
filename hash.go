@@ -15,3 +15,5 @@ func newDefaultHash() defaultHash {
 func (d defaultHash) Sum64(key string) uint64 {
 	return xxhash.Sum64(string2slice(key))
 }
+
+var defaultHasher = newDefaultHash()

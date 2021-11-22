@@ -20,7 +20,16 @@ func TestPower2(t *testing.T) {
 }
 
 func Test2Slice(t *testing.T) {
-	t.Log(string(string2slice("test is a test")))
+	b := string2slice("test is a test")
+	b[0] = 1
+}
+
+func TestArrayToSlice(t *testing.T) {
+	var a = [5]int{1, 2, 3, 4, 5}
+	b := (&a)[:2:2]
+	b[0] = 99
+	t.Log("a=", a)
+	t.Log("b=", b)
 }
 
 func Benchmark2SliceV1(b *testing.B) {

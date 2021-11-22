@@ -2,11 +2,33 @@ package cache
 
 import "sort"
 
+const (
+	chunkBit  = 64 // bit
+	keyBit    = 16 // bit
+	valueBit  = chunkBit - keyBit
+	maxBuffer = 1 << 40 // 256TB
+)
+
+type chunk struct {
+	kl int
+	vl int
+}
+
 type block struct {
 	si    int
 	total int
 	kl    int
 	vl    int
+}
+
+func decodeChunk(bytes [5]byte) (chunk chunk) {
+	chunk.kl = int(bytes[0])<<8 | int(bytes[1])
+	chunk.vl = int(bytes[2])<<16 | int(bytes[3])<<8 | int(bytes[4])
+	return
+}
+
+func (chunk chunk) encode() [5]byte {
+	return [5]byte{byte(chunk.kl >> 8), byte(chunk.kl), byte(chunk.vl >> 16), byte(chunk.vl >> 8), byte(chunk.vl)}
 }
 
 type sortBlocks []block
