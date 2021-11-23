@@ -3,15 +3,16 @@ package cache
 import "sort"
 
 const (
-	chunkBit  = 64 // bit
-	keyBit    = 16 // bit
-	valueBit  = chunkBit - keyBit
-	maxBuffer = 1 << 40 // 256TB
+	keyBit    = 15 // bit
+	valueBit  = 32
+	chunkBit  = keyBit + valueBit + 1 // 1 = usedBit
+	maxBuffer = 1 << 40               // 256TB
 )
 
 type chunk struct {
-	kl int
-	vl int
+	used int
+	kl   int
+	vl   int
 }
 
 type block struct {
@@ -21,14 +22,36 @@ type block struct {
 	vl    int
 }
 
-func decodeChunk(bytes [5]byte) (chunk chunk) {
-	chunk.kl = int(bytes[0])<<8 | int(bytes[1])
-	chunk.vl = int(bytes[2])<<16 | int(bytes[3])<<8 | int(bytes[4])
+func decodeChunk(bytes [chunkBit >> 3]byte) (chunk chunk) {
+	chunk.used = decode(bytes[:1]) & 0x1
+	chunk.kl = decode(bytes[:2]) >> 1
+	chunk.vl = decode(bytes[2:])
 	return
 }
 
-func (chunk chunk) encode() [5]byte {
-	return [5]byte{byte(chunk.kl >> 8), byte(chunk.kl), byte(chunk.vl >> 16), byte(chunk.vl >> 8), byte(chunk.vl)}
+func (chunk chunk) encode() (bytes [chunkBit >> 3]byte) {
+	encode(chunk.used, bytes[:1])
+	encode(chunk.kl<<1, bytes[:2])
+	encode(chunk.vl, bytes[2:])
+	return
+}
+
+func encode(v int, bytes []byte) {
+	for i := 0; i < len(bytes); i++ {
+		if v == 0 {
+			break
+		}
+		bytes[i] = byte(v)
+		v >>= 8
+	}
+}
+
+func decode(bytes []byte) (v int) {
+	for i := len(bytes) - 1; i >= 0; i-- {
+		v <<= 8
+		v += int(bytes[i])
+	}
+	return
 }
 
 type sortBlocks []block
