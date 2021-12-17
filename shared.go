@@ -7,6 +7,12 @@ import (
 
 const (
 	undefined = -1
+
+	flagLen  = 1
+	totalLen = 4
+	keyLen   = 2
+	valueLen = 4
+	headLen  = flagLen + totalLen + keyLen + valueLen
 )
 
 var (
@@ -15,7 +21,7 @@ var (
 )
 
 type shared struct {
-	keys map[uint64]block // hash -> block
+	keys map[uint64]int // hash -> si
 
 	recycle sortBlocks
 
@@ -33,95 +39,126 @@ type body struct {
 
 func newShared(max int) *shared {
 	return &shared{
-		keys:      make(map[uint64]block),
+		keys:      make(map[uint64]int),
 		collision: make(map[string][]byte),
-		buffer:    newBuffer(max),
+		buffer:    newBuffer(),
 	}
 }
 
-func (s *shared) get(hash uint64, key string) ([]byte, error) {
+func (s shared) get(hash uint64, key string) ([]byte, error) {
 	s.m.RLock()
+	defer s.m.RUnlock()
 	// hit collision
 	b, ok := s.collision[key]
 	if ok {
-		s.m.RUnlock()
 		return b, nil
 	}
 
-	block, ok := s.keys[hash]
+	si, ok := s.keys[hash]
 	if !ok {
-		s.m.RUnlock()
 		return nil, errKeyNotExist
 	}
 
-	si := block.si + block.kl
-	v, err := s.buffer.read(si, block.vl+si)
+	chunk := getChunk()
+	defer recycleChunk(chunk)
+
+	chunk.s = si
+
+	err := s.buffer.decode(chunk)
 	if err != nil {
-		s.m.RUnlock()
 		return nil, err
 	}
-	s.m.RUnlock()
-	return v, nil
+	return chunk.v, nil
 }
 
-func (s *shared) set(hash uint64, key string, v []byte) error {
-	s.m.Lock()
-	b, ok := s.keys[hash]
+func (shared *shared) set(hash uint64, key string, v []byte) error {
+	shared.m.Lock()
+	defer shared.m.Unlock()
+
+	s, ok := shared.keys[hash]
+
 	if ok {
-		oldKey, _ := s.buffer.read(b.si, b.si+b.kl)
-		if slice2string(oldKey) != key {
+		kvBuff := [headLen]byte{}
+		err := shared.buffer.read(s, s+headLen, kvBuff[:])
+		if err != nil {
+			return err
+		}
+
+		err := s.buffer.decode(chunk)
+		if err != nil {
+			return err
+		}
+
+		if slice2string(chunk.k) != key {
 			s.collision[key] = v
-			s.m.Unlock()
 			return nil
 		}
 
-		if len(v) > b.vl {
-			s.recycle.add(b)
+		if len(v) > int(chunk.vl) {
+			s.recycle.add(chunk)
 			delete(s.keys, hash)
 			ok = false
 		}
 	}
 
-	k := string2slice(key)
-	size := len(k) + len(v)
-
-	if !ok {
-		b, ok = s.recycle.getBlock(size)
+	// 已经存在
+	if ok {
+		if slice2string(v) == slice2string(chunk.v) {
+			return nil
+		}
+		chunk.kl = 0
+		chunk.k = nil
+		chunk.vl = int32(len(v))
+		chunk.total = int32(chunk.kl) + chunk.vl
+		chunk.v = v
+	} else {
+		k := string2slice(key)
+		total := int32(len(k) + len(v))
 		if !ok {
-			b = block{
-				si:    s.buffer.off,
-				total: size,
+			ok = s.recycle.getBlock(total, chunk)
+			if !ok {
+				chunk.used = ^unused
+				chunk.total = total
+				chunk.s = s.buffer.off
 			}
 		}
+
+		chunk.kl = int16(len(k))
+		chunk.vl = int32(len(v))
+		chunk.k = k
+		chunk.v = v
 	}
 
-	b.kl = len(k)
-	b.vl = len(v)
-	err := s.buffer.write(b.si, size, k, v)
+	err := s.buffer.encode(chunk)
 	if err != nil {
-		s.m.Unlock()
 		return err
 	}
-	s.keys[hash] = b
-	s.m.Unlock()
+	s.keys[hash] = chunk.s
 	return nil
 }
 
 func (s *shared) del(hash uint64, key string) {
 	s.m.Lock()
-	if _, ok := s.collision[key]; ok {
+	defer s.m.Unlock()
+	_, ok := s.collision[key]
+	if ok {
 		delete(s.collision, key)
-		s.m.Unlock()
 		return
 	}
 
-	block, ok := s.keys[hash]
+	chunk := getChunk()
+	defer recycleChunk(chunk)
+
+	chunk.s, ok = s.keys[hash]
 	if !ok {
-		s.m.Unlock()
 		return
 	}
 
-	s.recycle.add(block)
+	err := s.buffer.decode(chunk)
+	if err != nil {
+		return
+	}
+
+	s.recycle.add(chunk)
 	delete(s.keys, hash)
-	s.m.Unlock()
 }

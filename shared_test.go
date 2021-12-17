@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"strconv"
 	"testing"
 )
 
@@ -46,13 +45,23 @@ func BenchmarkSharedGet(b *testing.B) {
 	}
 }
 
+func add(b []byte) {
+	for i := 0; i < len(b); i++ {
+		b[i]++
+		if b[i] != 0 {
+			break
+		}
+	}
+}
+
 func BenchmarkSharedSet(b *testing.B) {
 	shared := newShared(1 << 30)
 	hasher := newDefaultHash()
-	b.ResetTimer()
+	k := []byte("\x00\x00\x00\x00")
+	v := []byte("xyza")
 	for i := 0; i < b.N; i++ {
-		key := strconv.FormatInt(int64(i), 10)
-		err := shared.set(hasher.Sum64(key), key, string2slice(key))
+		add(k)
+		err := shared.set(hasher.Sum64(slice2string(k)), slice2string(k), v)
 		if err != nil {
 			return
 		}

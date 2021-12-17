@@ -4,66 +4,6 @@ import (
 	"testing"
 )
 
-func TestAddBlock(t *testing.T) {
-	sb := sortBlocks{}
-	sb.add(block{
-		si:    1,
-		total: 10,
-	})
-	sb.add(block{
-		si:    11,
-		total: 20,
-	})
-	sb.add(block{
-		si:    32,
-		total: 2,
-	})
-	sb.add(block{
-		si:    35,
-		total: 1,
-	})
-}
-
-func TestGetBlock(t *testing.T) {
-	sb := sortBlocks{}
-	sb.add(block{
-		si:    1,
-		total: 10,
-	})
-	sb.add(block{
-		si:    11,
-		total: 20,
-	})
-	sb.add(block{
-		si:    32,
-		total: 2,
-	})
-	sb.add(block{
-		si:    35,
-		total: 1,
-	})
-	b, ok := sb.getBlock(1)
-	t.Log(b, ok)
-	b, ok = sb.getBlock(1)
-	t.Log(b, ok)
-	b, ok = sb.getBlock(1)
-	t.Log(b, ok)
-
-}
-
-func TestChunk(t *testing.T) {
-	chunk := chunk{
-		used: 1,
-		kl:   1<<16 - 1,
-		vl:   1<<31 - 1,
-	}
-
-	bytes := chunk.encode()
-
-	newChunk := decodeChunk(bytes)
-	t.Log(newChunk)
-}
-
 func TestEncode(t *testing.T) {
 	var b [4]byte
 	encode(16, b[:])
@@ -91,13 +31,28 @@ func TestDecodeEncode(t *testing.T) {
 	t.Log(decode(b[:]))
 }
 
-func BenchmarkDecodeEncode(b *testing.B) {
-	var n int
-	var bytes [4]byte
-	b.ResetTimer()
+func BenchmarkGetPutChunk(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		encode(i, bytes[:])
-		n = decode(bytes[:])
+		chunk := getChunk()
+		chunk.kl = 1
+		recycleChunk(chunk)
 	}
-	n++
+}
+
+func BenchmarkChunkEncode(b *testing.B) {
+	bytes := make([]byte, chunkBit)
+	b.ResetTimer()
+	k := []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	v := []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	for i := 0; i < b.N; i++ {
+		chunk := getChunk()
+		chunk.s = 0
+		chunk.k = k
+		chunk.v = v
+		chunk.kl = int16(len(k))
+		chunk.vl = int32(len(v))
+		chunk.encode(bytes)
+		recycleChunk(chunk)
+		bytes[0]++
+	}
 }

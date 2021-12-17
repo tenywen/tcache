@@ -19,11 +19,6 @@ func TestPower2(t *testing.T) {
 	t.Log(power2(math.MaxInt64))
 }
 
-func Test2Slice(t *testing.T) {
-	b := string2slice("test is a test")
-	b[0] = 1
-}
-
 func TestArrayToSlice(t *testing.T) {
 	var a = [5]int{1, 2, 3, 4, 5}
 	b := (&a)[:2:2]
@@ -37,14 +32,4 @@ func Benchmark2SliceV1(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		string2slice("123456")
 	}
-}
-
-func Benchmark2SliceV2(b *testing.B) {
-	key := "test is a test"
-	var t []byte
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		t = []byte(key)
-	}
-	t[0] = 1
 }

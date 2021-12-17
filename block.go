@@ -1,49 +1,88 @@
 package cache
 
-import "sort"
+import (
+	"sort"
+	"sync"
+)
 
 const (
-	keyBit    = 15 // bit
-	valueBit  = 32
-	chunkBit  = keyBit + valueBit + 1 // 1 = usedBit
-	maxBuffer = 1 << 40               // 256TB
+	unused    = 0
+	usedBit   = 1 // 1B
+	keyBit    = 2 // 64KB
+	valueBit  = 4 // 16MB
+	totalBit  = 4
+	chunkBit  = usedBit + totalBit + keyBit + valueBit
+	maxBuffer = 1 << 40 // 256TB
 )
 
 type chunk struct {
-	used int
-	kl   int
-	vl   int
+	used  int8
+	total int32
+	kl    int16
+	vl    int32
+	s     int
+	k     []byte
+	v     []byte
 }
 
 type block struct {
-	si    int
-	total int
-	kl    int
-	vl    int
+	s     int
+	total int32
 }
 
-func decodeChunk(bytes [chunkBit >> 3]byte) (chunk chunk) {
-	chunk.used = decode(bytes[:1]) & 0x1
-	chunk.kl = decode(bytes[:2]) >> 1
-	chunk.vl = decode(bytes[2:])
-	return
+var chunkPool = sync.Pool{
+	New: func() interface{} {
+		return &chunk{}
+	},
 }
 
-func (chunk chunk) encode() (bytes [chunkBit >> 3]byte) {
-	encode(chunk.used, bytes[:1])
-	encode(chunk.kl<<1, bytes[:2])
-	encode(chunk.vl, bytes[2:])
-	return
+func (chunk *chunk) decode(bytes []byte) error {
+	var s int
+	chunk.used = int8(decode(bytes[s : s+usedBit]))
+	if chunk.used != ^unused {
+		return errNotContent
+	}
+
+	s += usedBit
+	chunk.total = int32(decode(bytes[s : s+totalBit]))
+
+	s += totalBit
+	chunk.kl = int16(decode(bytes[s : s+keyBit]))
+
+	s += keyBit
+	chunk.vl = int32(decode(bytes[s : s+valueBit]))
+
+	return nil
 }
 
-func encode(v int, bytes []byte) {
+func (chunk *chunk) encode(bytes []byte) {
+	var s int
+	if chunk.used != 0 {
+		encode(int(chunk.used), bytes[s:usedBit])
+	}
+	s += usedBit
+	if chunk.total != 0 {
+		encode(int(chunk.total), bytes[s:s+totalBit])
+	}
+	s += totalBit
+	if chunk.kl != 0 {
+		encode(int(chunk.kl), bytes[s:s+keyBit])
+	}
+	s += keyBit
+	if chunk.vl != 0 {
+		encode(int(chunk.vl), bytes[s:s+valueBit])
+	}
+}
+
+func encode(v int, bytes []byte) int {
 	for i := 0; i < len(bytes); i++ {
 		if v == 0 {
-			break
+			return i
 		}
 		bytes[i] = byte(v)
 		v >>= 8
 	}
+	return 0
 }
 
 func decode(bytes []byte) (v int) {
@@ -68,11 +107,15 @@ func (sb sortBlocks) Less(i, j int) bool {
 	return sb[i].total < sb[j].total
 }
 
-func (sb *sortBlocks) add(b block) {
-	*sb = append(*sb, b)
+func (sb *sortBlocks) add(chunk *chunk) {
+	*sb = append(*sb, block{s: chunk.s, total: chunk.total})
 }
 
-func (sb *sortBlocks) getBlock(size int) (b block, ok bool) {
+func (sb *sortBlocks) getBlock(size int32, chunk *chunk) bool {
+	if len(*sb) == 0 {
+		return false
+	}
+
 	sort.Sort(*sb)
 	length := sb.Len()
 	index := sort.Search(length, func(i int) bool {
@@ -80,14 +123,13 @@ func (sb *sortBlocks) getBlock(size int) (b block, ok bool) {
 	})
 
 	if index >= length || (*sb)[index].total < size {
-		return
+		return false
 	}
 
-	ok = true
-	b = (*sb)[index]
+	chunk.total = int32((*sb)[index].total)
 
 	(*sb)[index] = (*sb)[length-1]
 	(*sb) = (*sb)[:length-1]
 
-	return
+	return true
 }

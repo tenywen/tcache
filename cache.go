@@ -2,7 +2,6 @@ package cache
 
 import (
 	"errors"
-	"math"
 )
 
 type Cache struct {
@@ -26,10 +25,8 @@ func New(opts ...opts) Cache {
 		shareds: make([]*shared, opt.nShared),
 	}
 
-	max := math.Ceil(float64(opt.maxSize) / float64(opt.nShared))
-
-	for i := 0; i < cache.opt.nShared; i++ {
-		cache.shareds[i] = newShared(int(max))
+	for i := 0; i < opt.nShared; i++ {
+		cache.shareds[i] = newShared(opt.maxSize)
 	}
 
 	return cache

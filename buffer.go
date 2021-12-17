@@ -5,90 +5,68 @@ import (
 )
 
 const (
-	int64Len      = 8
-	defaultBuffer = 1 << 22 // 4MB
+	int64Len = 8
 )
 
 var (
-	errReadPos  = errors.New("read start pos or end pos error")
-	errCapLimit = errors.New("buffer cap exceeds limit ")
+	errReadPos    = errors.New("read start pos or end pos error")
+	errCapLimit   = errors.New("buffer cap exceeds limit ")
+	errNotContent = errors.New("not content in this start pos")
 )
 
 type buffer struct {
-	max   int
-	off   int
-	bytes []byte
+	off    int
+	chunks [][]byte
 }
 
-func newBuffer(max int) buffer {
-	if max < defaultBuffer {
-		max = defaultBuffer
-	}
-
-	return buffer{
-		max: max,
-	}
+func newBuffer() buffer {
+	return buffer{}
 }
 
-func (b *buffer) grow(n int) bool {
-	if n <= 0 {
-		return true
+func (b *buffer) write(s int, v []byte) error {
+	length := len(v)
+
+	idx := s / chunkSize
+	for len(v) != 0 {
+		chunk := b.chunks[idx]
+		if chunk == nil {
+			chunk = getChunk()
+		}
+		v = v[copy(chunk[s%chunkSize:], v):]
+		b.chunks[idx] = chunk
+		idx++
 	}
 
-	if b.tryGrowByReslice(n) {
-		return true
-	}
-
-	c := cap(b.bytes) + n
-	p2 := power2(c)
-	if p2 < c {
-		return false
-	}
-
-	m := make([]byte, p2)
-	copy(m, b.bytes[:b.off])
-	b.bytes = m
-	return true
-}
-
-func (b *buffer) tryGrowByReslice(n int) bool {
-	if len(b.bytes) >= n+b.off {
-		return true
-	}
-
-	if n+b.off <= cap(b.bytes) {
-		b.bytes = b.bytes[:b.off+n]
-		return true
-	}
-
-	return false
-}
-
-func (b *buffer) write(si, n int, k, v []byte) error {
-	if si+n > b.max {
-		return errCapLimit
-	}
-
-	if si+n > b.off && !b.grow(si+n-b.off) {
-		return errCapLimit
-	}
-
-	copy(b.bytes[si:], k)
-	copy(b.bytes[si+len(k):], v)
-	if si+n > b.off {
-		b.off = si + n
+	if s+length > b.off {
+		b.off = s + length
 	}
 	return nil
 }
 
-func (b buffer) read(start, end int) ([]byte, error) {
-	if start < 0 || end < start {
-		return nil, errReadPos
+func (b *buffer) read(s, e int, dst []byte) error {
+	if s > e || s < 0 || e > b.off {
+		return errReadPos
 	}
 
-	if end > b.off {
-		return nil, errCapLimit
+	endIdx := e / chunkSize
+	for i := s; i <= e; {
+		idx := i / chunkSize
+		chunk := b.chunks[idx]
+		if endIdx != idx {
+			dst = append(dst, chunk[i%chunkSize:]...)
+			i += (chunkSize - i%chunkSize)
+		} else {
+			dst = append(dst, chunk[i%chunkSize:e%chunkSize]...)
+			i += (e % chunkSize)
+		}
 	}
 
-	return b.bytes[start:end], nil
+	return nil
+}
+
+func (b *buffer) writeInt(s int, v int) error {
+	small := getSmall()
+	defer recycleSmall(small)
+	length := encode(int(v), small)
+	return b.write(s, small[:length])
 }

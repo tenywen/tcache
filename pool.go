@@ -5,6 +5,20 @@ import (
 	"sync"
 )
 
+var small = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 4)
+	},
+}
+
+func getSmall() []byte {
+	return small.Get().([]byte)
+}
+
+func recycleSmall(b []byte) {
+	small.Put(b)
+}
+
 type pools struct {
 	min   int
 	max   int

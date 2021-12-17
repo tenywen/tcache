@@ -1,41 +1,60 @@
 package cache
 
 import (
+	"fmt"
 	"testing"
 )
 
-func TestGrow(t *testing.T) {
-	b := newBuffer(1024)
-	b.grow(2)
-	t.Log(len(b.bytes), cap(b.bytes))
-	b.grow(23)
-	t.Log(len(b.bytes), cap(b.bytes))
-	b.grow(125)
-	t.Log(len(b.bytes), cap(b.bytes))
-	b.grow(250)
-	t.Log(len(b.bytes), cap(b.bytes))
-	b.grow(257)
-	t.Log(len(b.bytes), cap(b.bytes))
+func BenchmarkBufferEncode(b *testing.B) {
+	buffer := newBuffer(1 << 30)
+	key := []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	value := []byte("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+
+	for i := 0; i < b.N; i++ {
+		chunk := getChunk()
+		chunk.used = ^unused
+		chunk.s = 0
+		chunk.kl = int16(len(key))
+		chunk.vl = int32(len(value))
+		chunk.total = int32(chunk.kl) + chunk.vl
+		chunk.k = key
+		chunk.v = value
+		err := buffer.encode(chunk)
+		if err != nil {
+			panic(err.Error())
+		}
+		recycleChunk(chunk)
+	}
 }
 
-func TestWriteBytes(t *testing.T) {
-	b := newBuffer(1024)
-	v := []byte("2222")
-	k := []byte("111")
-	b.write(b.off, len(v)+len(v), v, v)
-	t.Log(b.off)
-	b.write(0, len(k)+len(v), k, k)
-	t.Log(b.off)
-}
+func BenchmarkBufferEncodeDecode(b *testing.B) {
+	buffer := newBuffer(1 << 30)
+	key := []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	value := []byte("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 
-func TestReadBytes(t *testing.T) {
-	b := newBuffer(1024)
-	k := []byte("key234234")
-	v := []byte("value34234")
-	b.write(b.off, len(k)+len(v), k, v)
-	b.write(b.off, len(k)+len(v), k, v)
-	data, err := b.read(b.off-len(v), b.off)
-	t.Log(string(data), err)
-	data, err = b.read(b.off-len(v)-len(k), b.off-len(v))
-	t.Log(string(data), err)
+	for i := 0; i < b.N; i++ {
+		chunk := getChunk()
+		chunk.used = ^unused
+		chunk.s = 0
+		chunk.kl = int16(len(key))
+		chunk.vl = int32(len(value))
+		chunk.total = int32(chunk.kl) + chunk.vl
+		chunk.k = key
+		chunk.v = value
+		err := buffer.encode(chunk)
+		if err != nil {
+			panic(err.Error())
+		}
+
+		err = buffer.decode(chunk)
+		if err != nil {
+			panic(err.Error())
+		}
+
+		if slice2string(chunk.k) != slice2string(key) || slice2string(chunk.v) != slice2string(value) {
+			panic(fmt.Errorf("got %q %q want %q %q", chunk.k, chunk.v, key, value))
+		}
+
+		recycleChunk(chunk)
+	}
 }
