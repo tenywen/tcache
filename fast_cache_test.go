@@ -8,7 +8,7 @@ import (
 )
 
 func BenchmarkFastCacheSet(b *testing.B) {
-	const items = 1 << 20
+	const items = 1 << 16
 	c := fastcache.New(12 * items)
 	defer c.Reset()
 	b.ReportAllocs()

@@ -24,16 +24,22 @@ func newBuffer() buffer {
 }
 
 func (b *buffer) write(s int, v []byte) error {
-	length := len(v)
+	if s > b.off {
+		return errReadPos
+	}
 
+	length := len(v)
+	offset := s % chunkSize
 	idx := s / chunkSize
 	for len(v) != 0 {
-		chunk := b.chunks[idx]
-		if chunk == nil {
-			chunk = getChunk()
+		if len(b.chunks) == idx {
+			b.chunks = append(b.chunks, getChunk())
 		}
-		v = v[copy(chunk[s%chunkSize:], v):]
+
+		chunk := b.chunks[idx]
+		v = v[copy(chunk[offset:], v):]
 		b.chunks[idx] = chunk
+		offset = 0
 		idx++
 	}
 
@@ -43,25 +49,33 @@ func (b *buffer) write(s int, v []byte) error {
 	return nil
 }
 
-func (b *buffer) read(s, e int, dst []byte) error {
+func (b *buffer) read(s, e int, dst []byte) ([]byte, error) {
 	if s > e || s < 0 || e > b.off {
-		return errReadPos
+		return nil, errReadPos
 	}
 
-	endIdx := e / chunkSize
-	for i := s; i <= e; {
-		idx := i / chunkSize
+	length := e - s
+
+	if dst == nil {
+		dst = make([]byte, length)
+	}
+
+	if len(dst) > length {
+		dst = dst[:length]
+	}
+
+	tmp := dst
+	offset := s % chunkSize
+	idx := s / chunkSize
+
+	for len(tmp) > 0 {
 		chunk := b.chunks[idx]
-		if endIdx != idx {
-			dst = append(dst, chunk[i%chunkSize:]...)
-			i += (chunkSize - i%chunkSize)
-		} else {
-			dst = append(dst, chunk[i%chunkSize:e%chunkSize]...)
-			i += (e % chunkSize)
-		}
+		tmp = tmp[copy(tmp, chunk[offset:]):]
+		offset = 0
+		idx++
 	}
 
-	return nil
+	return dst, nil
 }
 
 func (b *buffer) writeInt(s int, v int) error {

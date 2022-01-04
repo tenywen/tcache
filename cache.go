@@ -2,6 +2,8 @@ package cache
 
 import (
 	"errors"
+
+	"github.com/cespare/xxhash/v2"
 )
 
 type Cache struct {
@@ -41,7 +43,7 @@ func (cache *Cache) Get(key string) ([]byte, error) {
 	return cache.shareds[hash%uint64(cache.opt.nShared)].get(hash, key)
 }
 
-func (cache *Cache) Set(key string, value []byte) error {
+func (cache *Cache) Set(key, value []byte) error {
 	if len(key) > cache.opt.keyMax {
 		return errKeyLimit
 	}
@@ -50,16 +52,19 @@ func (cache *Cache) Set(key string, value []byte) error {
 		return errValueLimit
 	}
 
-	hash := defaultHasher.Sum64(key)
+	hash := xxhash.Sum64(key)
 	return cache.shareds[hash%uint64(cache.opt.nShared)].set(hash, key, value)
 }
 
 func (cache *Cache) Delete(key string) error {
-	if len(key) > cache.opt.keyMax {
-		return errKeyLimit
-	}
-
-	hash := defaultHasher.Sum64(key)
-	cache.shareds[hash%uint64(cache.opt.nShared)].del(hash, key)
 	return nil
+	/*
+		if len(key) > cache.opt.keyMax {
+			return errKeyLimit
+		}
+
+		hash := defaultHasher.Sum64(key)
+		cache.shareds[hash%uint64(cache.opt.nShared)].del(hash, key)
+		return nil
+	*/
 }

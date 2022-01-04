@@ -5,7 +5,7 @@ const (
 )
 
 func getChunk() []byte {
-	return make([]byte, 65536)
+	return make([]byte, chunkSize)
 }
 
 func putChunk(chunk []byte) {

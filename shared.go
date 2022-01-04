@@ -8,7 +8,7 @@ import (
 const (
 	undefined = -1
 
-	flagLen  = 1
+	flagLen  = 0
 	totalLen = 4
 	keyLen   = 2
 	valueLen = 4
@@ -23,7 +23,7 @@ var (
 type shared struct {
 	keys map[uint64]int // hash -> si
 
-	recycle sortBlocks
+	//recycle sortBlocks
 
 	buffer buffer
 
@@ -45,98 +45,87 @@ func newShared(max int) *shared {
 	}
 }
 
-func (s shared) get(hash uint64, key string) ([]byte, error) {
-	s.m.RLock()
-	defer s.m.RUnlock()
+func (shared shared) get(hash uint64, key string) ([]byte, error) {
+	shared.m.RLock()
+	defer shared.m.RUnlock()
+
 	// hit collision
-	b, ok := s.collision[key]
+	v, ok := shared.collision[key]
 	if ok {
-		return b, nil
+		return v, nil
 	}
 
-	si, ok := s.keys[hash]
+	s, ok := shared.keys[hash]
 	if !ok {
 		return nil, errKeyNotExist
 	}
 
-	chunk := getChunk()
-	defer recycleChunk(chunk)
-
-	chunk.s = si
-
-	err := s.buffer.decode(chunk)
+	block, err := getBlock(s, &shared.buffer)
 	if err != nil {
 		return nil, err
 	}
-	return chunk.v, nil
+
+	v, err = shared.buffer.read(s+headLen+block.kl, s+headLen+block.kl+block.vl, v)
+	if err != nil {
+		return nil, err
+	}
+
+	return v, nil
 }
 
-func (shared *shared) set(hash uint64, key string, v []byte) error {
+func (shared *shared) set(hash uint64, key, v []byte) error {
 	shared.m.Lock()
 	defer shared.m.Unlock()
 
 	s, ok := shared.keys[hash]
 
 	if ok {
-		kvBuff := [headLen]byte{}
-		err := shared.buffer.read(s, s+headLen, kvBuff[:])
+		block, err := getBlock(s, &shared.buffer)
 		if err != nil {
 			return err
 		}
 
-		err := s.buffer.decode(chunk)
+		var k []byte
+
+		k, err = shared.buffer.read(s+headLen, s+headLen+block.kl, k)
 		if err != nil {
-			return err
-		}
-
-		if slice2string(chunk.k) != key {
-			s.collision[key] = v
 			return nil
 		}
 
-		if len(v) > int(chunk.vl) {
-			s.recycle.add(chunk)
-			delete(s.keys, hash)
-			ok = false
-		}
-	}
-
-	// 已经存在
-	if ok {
-		if slice2string(v) == slice2string(chunk.v) {
+		if slice2string(k) != slice2string(key) {
+			shared.collision[slice2string(key)] = v
 			return nil
 		}
-		chunk.kl = 0
-		chunk.k = nil
-		chunk.vl = int32(len(v))
-		chunk.total = int32(chunk.kl) + chunk.vl
-		chunk.v = v
-	} else {
-		k := string2slice(key)
-		total := int32(len(k) + len(v))
-		if !ok {
-			ok = s.recycle.getBlock(total, chunk)
-			if !ok {
-				chunk.used = ^unused
-				chunk.total = total
-				chunk.s = s.buffer.off
+
+		return nil
+		/*
+			if len(v) > int(chunk.vl) {
+				s.recycle.add(chunk)
+				delete(s.keys, hash)
+				ok = false
 			}
-		}
-
-		chunk.kl = int16(len(k))
-		chunk.vl = int32(len(v))
-		chunk.k = k
-		chunk.v = v
+		*/
 	}
 
-	err := s.buffer.encode(chunk)
+	var block block
+
+	block.s = shared.buffer.off
+	block.kl = len(key)
+	block.vl = len(v)
+	block.total = block.kl + block.vl + headLen
+	err := putBlock(block, &shared.buffer)
 	if err != nil {
 		return err
 	}
-	s.keys[hash] = chunk.s
+
+	shared.buffer.write(block.s+headLen, key)
+	shared.buffer.write(block.s+headLen+block.kl, v)
+
+	shared.keys[hash] = block.s
 	return nil
 }
 
+/*
 func (s *shared) del(hash uint64, key string) {
 	s.m.Lock()
 	defer s.m.Unlock()
@@ -162,3 +151,4 @@ func (s *shared) del(hash uint64, key string) {
 	s.recycle.add(chunk)
 	delete(s.keys, hash)
 }
+*/

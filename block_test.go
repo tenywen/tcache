@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"math/rand"
 	"testing"
 )
 
@@ -31,28 +32,34 @@ func TestDecodeEncode(t *testing.T) {
 	t.Log(decode(b[:]))
 }
 
-func BenchmarkGetPutChunk(b *testing.B) {
+func TestBlock(t *testing.T) {
+	buffer := newBuffer()
+	block := block{
+		kl:    1,
+		vl:    4,
+		total: 99,
+	}
+
+	t.Log(putBlock(block, &buffer))
+	nblock, err := getBlock(0, &buffer)
+	t.Logf("%+v %v\n", nblock, err)
+}
+
+func BenchmarkBlockEncode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		chunk := getChunk()
-		chunk.kl = 1
-		recycleChunk(chunk)
+		kv := [headLen]byte{}
+		encode(i, kv[:])
 	}
 }
 
-func BenchmarkChunkEncode(b *testing.B) {
-	bytes := make([]byte, chunkBit)
+func BenchmarkBlockDecode(b *testing.B) {
+	kv := [headLen]byte{}
+	encode(rand.Int(), kv[:])
 	b.ResetTimer()
-	k := []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-	v := []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	v := 0
 	for i := 0; i < b.N; i++ {
-		chunk := getChunk()
-		chunk.s = 0
-		chunk.k = k
-		chunk.v = v
-		chunk.kl = int16(len(k))
-		chunk.vl = int32(len(v))
-		chunk.encode(bytes)
-		recycleChunk(chunk)
-		bytes[0]++
+		v = decode(kv[:])
+		v++
 	}
+	v = 0
 }

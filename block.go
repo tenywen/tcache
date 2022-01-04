@@ -1,10 +1,5 @@
 package cache
 
-import (
-	"sort"
-	"sync"
-)
-
 const (
 	unused    = 0
 	usedBit   = 1 // 1B
@@ -27,13 +22,33 @@ type chunk struct {
 
 type block struct {
 	s     int
-	total int32
+	total int
+	kl    int
+	vl    int
+	k     []byte
+	v     []byte
 }
 
-var chunkPool = sync.Pool{
-	New: func() interface{} {
-		return &chunk{}
-	},
+func getBlock(s int, b *buffer) (block block, err error) {
+	kv := make([]byte, headLen)
+	kv, err = b.read(s, s+headLen, kv)
+	if err != nil {
+		return
+	}
+
+	block.s = s
+	block.total = decode(kv[:totalLen])
+	block.kl = decode(kv[totalLen : totalLen+keyLen])
+	block.vl = decode(kv[totalLen+keyLen:])
+	return
+}
+
+func putBlock(block block, b *buffer) error {
+	kv := [headLen]byte{}
+	encode(block.total, kv[:totalLen])
+	encode(block.kl, kv[totalLen:totalLen+keyLen])
+	encode(block.vl, kv[totalLen+keyLen:])
+	return b.write(block.s, kv[:])
 }
 
 func (chunk *chunk) decode(bytes []byte) error {
@@ -93,6 +108,7 @@ func decode(bytes []byte) (v int) {
 	return
 }
 
+/*
 type sortBlocks []block
 
 func (sb sortBlocks) Len() int {
@@ -133,3 +149,4 @@ func (sb *sortBlocks) getBlock(size int32, chunk *chunk) bool {
 
 	return true
 }
+*/
