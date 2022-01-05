@@ -9,7 +9,7 @@ func BenchmarkMyCacheGet(b *testing.B) {
 	const items = 1 << 16
 	cache := New(WithShared(512), WithMaxBuffer(1<<24))
 	k := []byte("\x00\x00\x00\x00")
-	v := []byte("xyza")
+	v := []byte("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
 	for i := 0; i < items; i++ {
 		k[0]++
 		if k[0] == 0 {

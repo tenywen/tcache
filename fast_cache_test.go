@@ -15,7 +15,7 @@ func BenchmarkFastCacheSet(b *testing.B) {
 	b.SetBytes(items)
 	b.RunParallel(func(pb *testing.PB) {
 		k := []byte("\x00\x00\x00\x00")
-		v := []byte("xyza")
+		v := []byte("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
 		for pb.Next() {
 			for i := 0; i < items; i++ {
 				k[0]++
@@ -93,6 +93,7 @@ func BenchmarkFastCacheHas(b *testing.B) {
 	})
 }
 
+/*
 func BenchmarkFastCacheSetGet(b *testing.B) {
 	const items = 1 << 16
 	c := fastcache.New(12 * items)
@@ -124,3 +125,4 @@ func BenchmarkFastCacheSetGet(b *testing.B) {
 		}
 	})
 }
+*/

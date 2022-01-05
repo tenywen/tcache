@@ -1,5 +1,6 @@
 package cache
 
+/*
 const (
 	unused    = 0
 	usedBit   = 1 // 1B
@@ -149,4 +150,5 @@ func (sb *sortBlocks) getBlock(size int32, chunk *chunk) bool {
 
 	return true
 }
+*
 */

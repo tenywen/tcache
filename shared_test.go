@@ -61,5 +61,4 @@ func BenchmarkSharedSet(b *testing.B) {
 		}
 	}
 
-	b.Log("len=", len(shared.collision))
 }
