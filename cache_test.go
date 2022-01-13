@@ -5,59 +5,39 @@ import (
 	"testing"
 )
 
-func BenchmarkMyCacheGet(b *testing.B) {
-	const items = 1 << 16
-	cache := New(WithShared(512), WithMaxBuffer(1<<24))
+func TestMyCacheSet(t *testing.T) {
+	cache := New(WithShared(1024))
 	k := []byte("\x00\x00\x00\x00")
-	v := []byte("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
-	for i := 0; i < items; i++ {
-		k[0]++
-		if k[0] == 0 {
-			k[1]++
-		}
-		cache.Set(k, v)
+	v := []byte("xyzx")
+	//k[0]++
+	err := cache.Set(slice2string(k), v)
+	if err != nil {
+		t.Log(err)
 	}
-
-	b.ReportAllocs()
-	b.SetBytes(items)
-	b.RunParallel(func(pb *testing.PB) {
-		k := []byte("\x00\x00\x00\x00")
-		for pb.Next() {
-			for i := 0; i < items; i++ {
-				k[0]++
-				if k[0] == 0 {
-					k[1]++
-				}
-				buf, _ := cache.Get(slice2string(k))
-				if slice2string(buf) != slice2string(v) {
-					panic(fmt.Errorf("BUG: key:%q got %q want:%q ", k, buf, v))
-				}
-			}
-		}
-	})
+	//k[0]++
+	err = cache.Set(slice2string(k), v)
+	if err != nil {
+		t.Log(err)
+	}
 }
 
-func BenchmarkMyCacheSet(b *testing.B) {
-	const items = 1 << 16
-	cache := New(WithShared(512), WithMaxBuffer(5))
-	b.ReportAllocs()
-	b.SetBytes(items)
-	b.RunParallel(func(pb *testing.PB) {
-		k := []byte("\x00\x00\x00\x00")
-		v := []byte("xyza")
-		for pb.Next() {
-			for i := 0; i < items; i++ {
-				k[0]++
-				if k[0] == 0 {
-					k[1]++
-				}
-				//add(k)
-				err := cache.Set(k, v)
-				if err != nil {
-					panic(err.Error())
-				}
-			}
-			//b.Log("len:", cache.shareds[0].buffer.off, "cap:", cap(cache.shareds[0].buffer.bytes))
-		}
-	})
+func TestMyCacheGet(t *testing.T) {
+	c := New(WithShared(1024))
+	k := []byte("\x00\x00\x00\x00")
+	v := []byte("xyzx")
+	err := c.Set(string(k), v)
+	t.Logf("set %s %s err:%v", string(k), string(v), err)
+	if err != nil {
+		return
+	}
+
+	result, err := c.Get(string(k))
+	t.Logf("get %s %s err:%v", string(k), string(result), err)
+	if err != nil {
+		return
+	}
+
+	if string(result) != string(v) {
+		panic(fmt.Errorf("get key:%q  want:%s got:%s", k, string(v), string(result)))
+	}
 }

@@ -2,12 +2,13 @@ package cache
 
 import (
 	"errors"
-
-	"github.com/cespare/xxhash/v2"
+	"log"
+	"sync/atomic"
 )
 
 type Cache struct {
 	opt     opt
+	stat    stat
 	shareds []*shared
 }
 
@@ -22,49 +23,67 @@ func New(opts ...opts) Cache {
 		opts[k](&opt)
 	}
 
-	cache := Cache{
+	c := Cache{
 		opt:     opt,
 		shareds: make([]*shared, opt.nShared),
 	}
 
 	for i := 0; i < opt.nShared; i++ {
-		cache.shareds[i] = newShared(opt.maxSize)
+		c.shareds[i] = newShared(c.opt)
 	}
 
-	return cache
+	return c
 }
 
-func (cache *Cache) Get(key string) ([]byte, error) {
-	if len(key) > cache.opt.keyMax {
+func (c *Cache) Get(key string) ([]byte, error) {
+	if len(key) > keyLimit {
 		return nil, errKeyLimit
 	}
 
 	hash := defaultHasher.Sum64(key)
-	return cache.shareds[hash%uint64(cache.opt.nShared)].get(hash, key)
+	return c.shareds[hash%uint64(c.opt.nShared)].get(c.opt.neverConflict, hash, key)
 }
 
-func (cache *Cache) Set(key, value []byte) error {
-	if len(key) > cache.opt.keyMax {
+func (c *Cache) Set(key string, value []byte) error {
+	if len(key) > keyLimit {
 		return errKeyLimit
 	}
 
-	if len(value) > cache.opt.valueMax {
+	if len(value) > valueLimit {
 		return errValueLimit
 	}
 
-	hash := xxhash.Sum64(key)
-	return cache.shareds[hash%uint64(cache.opt.nShared)].set(hash, key, value)
+	hash := defaultHasher.Sum64(key)
+	return c.shareds[hash%uint64(c.opt.nShared)].set(c.opt.neverConflict, hash, key, value)
 }
 
-func (cache *Cache) Delete(key string) error {
-	return nil
-	/*
-		if len(key) > cache.opt.keyMax {
-			return errKeyLimit
-		}
+func (c *Cache) Delete(key string) error {
+	if len(key) > keyLimit {
+		return errKeyLimit
+	}
 
-		hash := defaultHasher.Sum64(key)
-		cache.shareds[hash%uint64(cache.opt.nShared)].del(hash, key)
-		return nil
-	*/
+	hash := defaultHasher.Sum64(key)
+	c.shareds[hash%uint64(c.opt.nShared)].delete(hash, key)
+	return nil
+}
+
+func (c Cache) Debug() {
+	var calls int64
+	var miss int64
+	var removes int64
+	var totals int64
+
+	for k := range c.shareds {
+		calls += atomic.LoadInt64(&c.shareds[k].stat.calls)
+		miss += atomic.LoadInt64(&c.shareds[k].stat.missCnt)
+		removes += atomic.LoadInt64(&c.shareds[k].stat.removeBytes)
+		totals += atomic.LoadInt64(&c.shareds[k].stat.totalBytes)
+	}
+
+	log.Println("cache stat debug")
+	log.Printf("call:%d\n", calls)
+	log.Printf("miss:%d  %.2f\n", miss, float64(miss)/float64(calls))
+	log.Printf("remove:%s\n", printBytes(removes))
+	log.Printf("total:%s\n", printBytes(totals))
+	log.Println("")
 }

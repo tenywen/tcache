@@ -3,6 +3,7 @@ package cache
 import (
 	"fmt"
 	"log"
+	"sync/atomic"
 )
 
 var (
@@ -16,38 +17,47 @@ var (
 )
 
 type stat struct {
-	hitCnt      int // hit
-	missCnt     int //miss
-	removeBytes int
-	totalBytes  int
+	calls        int64 // hit
+	missCnt      int64 // miss
+	collisionCnt int64
+	removeBytes  int64
+	totalBytes   int64
 }
 
-func (stat *stat) hit() {
-	stat.hitCnt++
+func (stat *stat) call() {
+	atomic.AddInt64(&stat.calls, 1)
 }
 
 func (stat *stat) miss() {
-	stat.missCnt++
+	atomic.AddInt64(&stat.missCnt, 1)
 }
 
-func (stat *stat) remove(bytes int) {
-	stat.removeBytes += bytes
+func (stat *stat) collision() {
+	atomic.AddInt64(&stat.collisionCnt, 1)
 }
 
-func (stat *stat) add(bytes int) {
-	stat.totalBytes += bytes
+func (stat *stat) remove(bytes int64) {
+	atomic.AddInt64(&stat.removeBytes, bytes)
+}
+
+func (stat *stat) add(bytes int64) {
+	atomic.AddInt64(&stat.totalBytes, bytes)
 }
 
 func (stat *stat) debug() {
+	calls := atomic.LoadInt64(&stat.calls)
+	miss := atomic.LoadInt64(&stat.missCnt)
+	removes := atomic.LoadInt64(&stat.removeBytes)
+	totals := atomic.LoadInt64(&stat.totalBytes)
 	log.Println("cache stat debug")
-	log.Printf("hit:%d\n", stat.hitCnt)
-	log.Printf("miss:%d  %.2f\n", stat.missCnt, float64(stat.missCnt)/float64(stat.hitCnt))
-	log.Printf("remove:%s\n", printBytes(stat.removeBytes))
-	log.Printf("total:%s\n", printBytes(stat.totalBytes))
+	log.Printf("call:%d\n", calls)
+	log.Printf("miss:%d  %.2f\n", miss, float64(miss)/float64(calls))
+	log.Printf("remove:%s\n", printBytes(removes))
+	log.Printf("total:%s\n", printBytes(totals))
 	log.Println("")
 }
 
-func printBytes(size int) string {
+func printBytes(size int64) string {
 	var index int
 	const base = 1 << 10 // 1k
 	for size >= base {

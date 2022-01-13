@@ -28,5 +28,9 @@ func TestHash(t *testing.T) {
 	t.Log("collison:", collison)
 }
 
-func BenchmarkHash(b *testing.B) {
+func TestHashDiff(t *testing.T) {
+	k1 := []byte("\xc1\xee\x00\x00")
+	k2 := []byte("\xff\x0d\x00\x00")
+	t.Log(xxhash.Sum64(k1))
+	t.Log(xxhash.Sum64(k2))
 }

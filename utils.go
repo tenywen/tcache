@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"math"
 	"unsafe"
 )
 
@@ -16,10 +15,7 @@ type stringHeader struct {
 	Len  int
 }
 
-const (
-	max = math.MaxInt64
-)
-
+/*
 func power2(cap int) int {
 	cap = cap - 1
 	cap |= cap >> 1
@@ -38,9 +34,10 @@ func power2(cap int) int {
 
 	return cap + 1
 }
+*/
 
 func string2slice(k string) []byte {
-	const max = 0x7fff0000
+	const max = 0x7fff0000 // 2G
 	if len(k) > max {
 		panic("string too long")
 	}
