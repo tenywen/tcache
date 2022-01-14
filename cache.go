@@ -35,13 +35,13 @@ func New(opts ...opts) Cache {
 	return c
 }
 
-func (c *Cache) Get(key string) ([]byte, error) {
+func (c *Cache) Get(key string, dst []byte) ([]byte, error) {
 	if len(key) > keyLimit {
 		return nil, errKeyLimit
 	}
 
 	hash := defaultHasher.Sum64(key)
-	return c.shareds[hash%uint64(c.opt.nShared)].get(c.opt.neverConflict, hash, key)
+	return c.shareds[hash%uint64(c.opt.nShared)].get(c.opt.neverConflict, hash, key, dst)
 }
 
 func (c *Cache) Set(key string, value []byte) error {

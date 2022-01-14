@@ -31,7 +31,7 @@ func TestMyCacheGet(t *testing.T) {
 		return
 	}
 
-	result, err := c.Get(string(k))
+	result, err := c.Get(string(k), nil)
 	t.Logf("get %s %s err:%v", string(k), string(result), err)
 	if err != nil {
 		return

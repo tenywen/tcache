@@ -23,10 +23,10 @@ func TestSharedRecycle(t *testing.T) {
 	shared.recycle()
 
 	key := "1111"
-	v, err := shared.get(false, defaultHasher.Sum64(key), key)
+	v, err := shared.get(false, defaultHasher.Sum64(key), key, nil)
 	t.Logf("k=%s v=%s err=%v ts=%v\n", key, slice2string(v), err, time.Now().Sub(start))
 
 	key = "10001"
-	v, err = shared.get(false, defaultHasher.Sum64(key), key)
+	v, err = shared.get(false, defaultHasher.Sum64(key), key, nil)
 	t.Logf("k=%s v=%s err=%v ts=%v\n", key, v, err, time.Now().Sub(start))
 }

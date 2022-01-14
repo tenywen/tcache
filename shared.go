@@ -50,7 +50,7 @@ func newShared(opt opt) *shared {
 	return shared
 }
 
-func (shared *shared) get(neverConflict bool, hash uint64, key string) (v []byte, err error) {
+func (shared *shared) get(neverConflict bool, hash uint64, key string, dst []byte) (v []byte, err error) {
 	var k []byte
 	shared.stat.call()
 	shared.mu.RLock()
@@ -65,7 +65,7 @@ func (shared *shared) get(neverConflict bool, hash uint64, key string) (v []byte
 
 		s += int32(block.kl)
 		if slice2string(k) == key {
-			v, err = shared.read(s, s+int32(block.vl), nil)
+			v, err = shared.read(s, s+int32(block.vl), dst)
 			goto END
 		}
 	}
