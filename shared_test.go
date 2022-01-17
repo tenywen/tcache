@@ -30,3 +30,15 @@ func TestSharedRecycle(t *testing.T) {
 	v, err = shared.get(false, defaultHasher.Sum64(key), key, nil)
 	t.Logf("k=%s v=%s err=%v ts=%v\n", key, v, err, time.Now().Sub(start))
 }
+
+func TestSharedCompare(t *testing.T) {
+	shared := newShared(defaultOpt())
+	key := []byte("123456")
+	err := shared.set(false, defaultHasher.Sum64(slice2string(key)), slice2string(key), key)
+	if err != nil {
+		t.Logf("set err=%v\n", err)
+	}
+
+	ok := shared.compare(0, int32(len(key)), []byte("123456"))
+	t.Logf("compare result:%v\n", ok)
+}

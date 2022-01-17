@@ -58,7 +58,7 @@ func BenchmarkFastCacheSetLikeFastCache(b *testing.B) {
 }
 
 func BenchmarkFastCacheGetLikeFastCache(b *testing.B) {
-	c := fastcache.New(12 * items)
+	c := fastcache.New(12 * items << 10)
 	defer c.Reset()
 	k := []byte("\x00\x00\x00\x00")
 	v := []byte("xyza")
@@ -70,6 +70,7 @@ func BenchmarkFastCacheGetLikeFastCache(b *testing.B) {
 		c.Set(k, v)
 	}
 
+	b.ResetTimer()
 	b.ReportAllocs()
 	b.SetBytes(items)
 	b.RunParallel(func(pb *testing.PB) {
@@ -91,7 +92,7 @@ func BenchmarkFastCacheGetLikeFastCache(b *testing.B) {
 }
 
 func BenchmarkMyCacheGetLikeFastCache(b *testing.B) {
-	cache := New(WithShared(2048))
+	cache := New(WithShared(1024))
 	k := []byte("\x00\x00\x00\x00")
 	v := []byte("xyza")
 	for i := 0; i < items; i++ {
@@ -102,6 +103,7 @@ func BenchmarkMyCacheGetLikeFastCache(b *testing.B) {
 		cache.Set(slice2string(k), v)
 	}
 
+	b.ResetTimer()
 	b.ReportAllocs()
 	b.SetBytes(items)
 	b.RunParallel(func(pb *testing.PB) {

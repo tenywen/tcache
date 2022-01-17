@@ -51,22 +51,17 @@ func newShared(opt opt) *shared {
 }
 
 func (shared *shared) get(neverConflict bool, hash uint64, key string, dst []byte) (v []byte, err error) {
-	var k []byte
-	shared.stat.call()
 	shared.mu.RLock()
+	shared.stat.call()
 
 	block, ok := shared.keys[hash]
 	if ok {
 		s := block.s
-		k, err = shared.read(s, s+int32(block.kl), nil)
-		if err != nil {
-			goto END
-		}
-
-		s += int32(block.kl)
-		if slice2string(k) == key {
+		if shared.compare(s, s+int32(block.kl), string2slice(key)) {
+			s += int32(block.kl)
 			v, err = shared.read(s, s+int32(block.vl), dst)
 			goto END
+
 		}
 	}
 
@@ -96,14 +91,10 @@ func (shared *shared) set(neverConflict bool, hash uint64, key string, v []byte)
 	block, ok := shared.keys[hash]
 	if ok {
 		if neverConflict {
-			k, err := shared.read(block.s, block.s+int32(block.kl), nil)
-			if err != nil {
-				goto END
-			}
-
-			if slice2string(k) != key {
+			if !shared.compare(block.s, block.s+int32(block.kl), string2slice(key)) {
 				shared.collision[key] = v
 				goto END
+
 			}
 		}
 
@@ -223,7 +214,7 @@ func (shared *shared) write(s int32, v []byte) error {
 	offset := s % chunkSize
 	idx := s / chunkSize
 
-	for i := 0; i < len(v); i++ {
+	for i := 0; i < len(v); {
 		if int32(len(shared.chunks)) == idx {
 			shared.chunks = append(shared.chunks, getChunk())
 		}
@@ -240,6 +231,33 @@ func (shared *shared) write(s int32, v []byte) error {
 	return nil
 }
 
+func (shared *shared) compare(s, e int32, key []byte) bool {
+	if s > e || s < 0 || e > shared.off || len(key) != int(e-s) {
+		return false
+	}
+
+	offset := s % chunkSize
+	idx := s / chunkSize
+
+	for len(key) != 0 {
+		chunk := shared.chunks[idx]
+		length := int32(len(key))
+		if length > chunkSize-offset {
+			length = chunkSize - offset
+		}
+
+		if slice2string(chunk[offset:offset+length]) != slice2string(key[:length]) {
+			return false
+		}
+
+		offset = 0
+		idx++
+		key = key[length:]
+	}
+
+	return true
+}
+
 func (shared *shared) read(s, e int32, dst []byte) ([]byte, error) {
 	if s > e || s < 0 || e > shared.off {
 		return nil, errStartPos
@@ -249,10 +267,6 @@ func (shared *shared) read(s, e int32, dst []byte) ([]byte, error) {
 
 	if dst == nil {
 		dst = make([]byte, length)
-	}
-
-	if int32(len(dst)) < length {
-		length = int32(len(dst))
 	}
 
 	offset := s % chunkSize
@@ -265,7 +279,7 @@ func (shared *shared) read(s, e int32, dst []byte) ([]byte, error) {
 		idx++
 	}
 
-	return dst[:length], nil
+	return dst, nil
 }
 
 func (shared *shared) recycle() error {
