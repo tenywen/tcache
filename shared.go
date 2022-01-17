@@ -33,11 +33,6 @@ type shared struct {
 	mu sync.RWMutex
 }
 
-type body struct {
-	k []byte
-	v []byte
-}
-
 func newShared(opt opt) *shared {
 	shared := &shared{
 		keys: make(map[uint64]block),
