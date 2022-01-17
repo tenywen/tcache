@@ -4,6 +4,8 @@ import (
 	"testing"
 )
 
+var bytes []byte
+
 func TestArrayToSlice(t *testing.T) {
 	var a = [5]int{1, 2, 3, 4, 5}
 	b := (&a)[:2:2]
@@ -12,9 +14,9 @@ func TestArrayToSlice(t *testing.T) {
 	t.Log("b=", b)
 }
 
-func Benchmark2SliceV1(b *testing.B) {
-	b.ResetTimer()
+func Benchmark2String(b *testing.B) {
+	s := "tenywen"
 	for i := 0; i < b.N; i++ {
-		string2slice("123456")
+		bytes = string2slice(s)
 	}
 }

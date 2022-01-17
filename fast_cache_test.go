@@ -9,7 +9,7 @@ import (
 
 const items = 1 << 16
 
-func BenchmarkMyCacheSetLikeFastCache(b *testing.B) {
+func BenchmarkMyCacheSet(b *testing.B) {
 	cache := New(WithShared(2048))
 	b.ReportAllocs()
 	b.SetBytes(items)
@@ -32,7 +32,7 @@ func BenchmarkMyCacheSetLikeFastCache(b *testing.B) {
 	//cache.Debug()
 }
 
-func BenchmarkFastCacheSetLikeFastCache(b *testing.B) {
+func BenchmarkFastCacheSet(b *testing.B) {
 	c := fastcache.New(12 * items)
 	defer c.Reset()
 	b.ReportAllocs()
@@ -57,7 +57,7 @@ func BenchmarkFastCacheSetLikeFastCache(b *testing.B) {
 	*/
 }
 
-func BenchmarkFastCacheGetLikeFastCache(b *testing.B) {
+func BenchmarkFastCacheGet(b *testing.B) {
 	c := fastcache.New(12 * items << 10)
 	defer c.Reset()
 	k := []byte("\x00\x00\x00\x00")
@@ -91,7 +91,7 @@ func BenchmarkFastCacheGetLikeFastCache(b *testing.B) {
 	})
 }
 
-func BenchmarkMyCacheGetLikeFastCache(b *testing.B) {
+func BenchmarkMyCacheGet(b *testing.B) {
 	cache := New(WithShared(1024))
 	k := []byte("\x00\x00\x00\x00")
 	v := []byte("xyza")
