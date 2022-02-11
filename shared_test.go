@@ -42,3 +42,14 @@ func TestSharedCompare(t *testing.T) {
 	ok := shared.compare(0, int32(len(key)), []byte("123456"))
 	t.Logf("compare result:%v\n", ok)
 }
+
+func TestSharedSet(t *testing.T) {
+	shared := newShared(defaultOpt())
+	key := []byte("123456")
+	t.Log(len(key) + len(key))
+	err := shared.set(false, defaultHasher.Sum64(slice2string(key)), slice2string(key), key)
+	if err != nil {
+		t.Logf("set err=%v\n", err)
+	}
+	shared.stat.debug()
+}

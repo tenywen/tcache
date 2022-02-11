@@ -49,7 +49,7 @@ func (stat *stat) debug() {
 	miss := atomic.LoadInt64(&stat.missCnt)
 	removes := atomic.LoadInt64(&stat.removeBytes)
 	totals := atomic.LoadInt64(&stat.totalBytes)
-	log.Println("cache stat debug")
+	log.Println("cache shared stat debug")
 	log.Printf("call:%d\n", calls)
 	log.Printf("miss:%d  %.2f\n", miss, float64(miss)/float64(calls))
 	log.Printf("remove:%s\n", printBytes(removes))
@@ -59,11 +59,12 @@ func (stat *stat) debug() {
 
 func printBytes(size int64) string {
 	var index int
+	v := float64(size)
 	const base = 1 << 10 // 1k
-	for size >= base {
+	for v/base > 1 {
 		index++
-		size /= base
+		v /= base
 	}
 
-	return fmt.Sprintf("%d%s", size, format[index])
+	return fmt.Sprintf("%.2f%s", v, format[index])
 }

@@ -1,7 +1,7 @@
 [![996.icu](https://img.shields.io/badge/link-996.icu-red.svg)](https://996.icu)
 [![LICENSE](https://img.shields.io/badge/license-Anti%20996-blue.svg)](https://github.com/tenywen/cache/blob/master/LICENSE)
 
-# Cache - inmemory cache in Go
+# tcache - inmemory cache in Go
 
 读写速度更快，更好适应并发的，尽可能避免gc的内置cache.
 

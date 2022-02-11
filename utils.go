@@ -47,3 +47,12 @@ func string2slice(k string) []byte {
 func slice2string(k []byte) string {
 	return *(*string)(unsafe.Pointer(&k))
 }
+
+// for benchmark
+func B2S(k []byte) string {
+	return slice2string(k)
+}
+
+func S2B(s string) []byte {
+	return string2slice(s)
+}

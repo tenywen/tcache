@@ -82,7 +82,7 @@ func (c Cache) Debug() {
 
 	log.Println("cache stat debug")
 	log.Printf("call:%d\n", calls)
-	log.Printf("miss:%d  %.2f\n", miss, float64(miss)/float64(calls))
+	log.Printf("miss:%d  ratio:%.2f\n", miss, float64(miss)/float64(calls))
 	log.Printf("remove:%s\n", printBytes(removes))
 	log.Printf("total:%s\n", printBytes(totals))
 	log.Println("")

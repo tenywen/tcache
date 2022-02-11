@@ -107,9 +107,6 @@ func (shared *shared) set(neverConflict bool, hash uint64, key string, v []byte)
 SET:
 	if !ok {
 		block, ok = shared.getBlock(total)
-		if ok {
-			shared.stat.remove(int64(-total))
-		}
 	}
 
 	block.kl = int16(len(key))
@@ -156,8 +153,8 @@ func (shared shared) debug() {
 
 func (shared *shared) delete(hash uint64, key string) {
 	shared.mu.Lock()
-	defer shared.mu.Unlock()
 	shared.remove(hash, key)
+	shared.mu.Unlock()
 }
 
 func (shared *shared) remove(hash uint64, key string) {
@@ -189,8 +186,8 @@ func (shared *shared) getBlock(size uint16) (block block, ok bool) {
 		block = shared.removes[i]
 		shared.removes[i], shared.removes[length-1] = shared.removes[length-1], shared.removes[i]
 		shared.removes = shared.removes[:length-1]
+		shared.stat.remove(int64(-size))
 		ok = true
-		shared.stat.remove(int64(block.total))
 		return
 	}
 
