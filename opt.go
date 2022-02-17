@@ -1,4 +1,4 @@
-package cache
+package tcache
 
 const (
 	keyLimit   = 1 << 16 // 64K

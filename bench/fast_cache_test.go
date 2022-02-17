@@ -1,9 +1,9 @@
-package cache
+package tcache
 
 import (
-	. "cache"
 	"fmt"
 	"sync"
+	. "tcache"
 	"testing"
 	"time"
 	"unsafe"

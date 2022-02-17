@@ -1,4 +1,4 @@
-package cache
+package tcache
 
 import xxhash "github.com/cespare/xxhash/v2"
 

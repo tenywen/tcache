@@ -1,6 +1,6 @@
 // +build !appengine,!windows
 
-package cache
+package tcache
 
 import (
 	"fmt"

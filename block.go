@@ -1,4 +1,4 @@
-package cache
+package tcache
 
 type block struct {
 	total uint16
